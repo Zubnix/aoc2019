@@ -1,6 +1,6 @@
 # aoc2019
 kladderblok
-
+# DAY 1
 ```javscript
 const input = `146561
 98430
@@ -104,13 +104,13 @@ const input = `146561
 130153`
 ```
 
-# day 1
+# 1
 ```javascript
 const calcFuel = module => Math.floor(module/3)-2
 input.split("\n").map(value=>value.trim()).map(calcFuel).reduce((total,num)=>total+num)
 ```
 
-# day 2
+# 2
 ```javascript
 const calcFuel = module => Math.max(Math.floor(module/3)-2,0)
 const allFuel = mass => {
