@@ -112,13 +112,12 @@ input.split("\n").map(value=>value.trim()).map(calcFuel).reduce((total,num)=>tot
 
 # day 2
 ```javascript
-const calcFuel = module =>Math.floor(module/3)-2
-
-function allFuel(mass) {
+const calcFuel = module =>Math.max(Math.floor(module/3)-2)
+const allFuel = mass => {
   if(mass === 0){
     return 0
   }
-  fuel = Math.max(calcFuel(mass),0)
+  fuel = calcFuel(mass)
   return fuel + allFuel(fuel)
 }
 
