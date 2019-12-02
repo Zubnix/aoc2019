@@ -1,5 +1,5 @@
 # aoc2019
-advent of code 2019 kladderblok
+kladderblok
 
 ```javscript
 const input = `146561
@@ -106,14 +106,14 @@ const input = `146561
 
 # day 1
 ```javascript
-const calcFuel = (module)=>Math.floor(module/3)-2
+const calcFuel = module =>Math.floor(module/3)-2
 input.split("\n").map(value=>value.trim()).map(calcFuel).reduce((total,num)=>total+num)
 ```
 
 # day 2
-const calcFuel = (module)=>Math.floor(module/3)-2
-
 ```javascript
+const calcFuel = module =>Math.floor(module/3)-2
+
 function allFuel(mass) {
   if(mass === 0){
     return 0
