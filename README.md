@@ -106,20 +106,18 @@ const input = `146561
 
 # day 1
 ```javascript
-const calcFuel = module =>Math.floor(module/3)-2
+const calcFuel = module => Math.floor(module/3)-2
 input.split("\n").map(value=>value.trim()).map(calcFuel).reduce((total,num)=>total+num)
 ```
 
 # day 2
 ```javascript
-const calcFuel = module =>Math.max(Math.floor(module/3)-2)
+const calcFuel = module => Math.max(Math.floor(module/3)-2,0)
 const allFuel = mass => {
-  if(mass === 0){
-    return 0
-  }
-  fuel = calcFuel(mass)
+  if(mass === 0){ return 0 }
+  const fuel = calcFuel(mass)
   return fuel + allFuel(fuel)
 }
 
-input.split("\n").map(value=>value.trim()).map(allFuel).reduce((total,num)=>total+num)
+input.split("\n").map(value => value.trim()).map(allFuel).reduce((total, num) => total+num)
 ```
