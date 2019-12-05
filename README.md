@@ -121,3 +121,170 @@ const allFuel = mass => {
 
 input.split("\n").map(value => value.trim()).map(allFuel).reduce((total, num) => total+num)
 ```
+
+# Day 2
+```javascript
+class Pointer {
+  /**
+   * @param {Array<number>}memory
+   * @param {number}address
+   */
+  constructor (memory, address) {
+    /**
+     * @type {Array<number>}
+     */
+    this.memory = memory
+    /**
+     * @type {number}
+     */
+    this.address = address
+  }
+
+  /**
+   * @return {number}
+   */
+  dereference (offset) {
+    return this.memory[this.address + (offset || 0)]
+  }
+
+  /**
+   * @param {number}value
+   */
+  write (value) {
+    this.memory[this.address] = value
+  }
+
+  /**
+   * @param {number}offset
+   * @return {Pointer}
+   */
+  pointerWithOffset (offset) {
+    return new Pointer(this.memory, this.address + offset)
+  }
+}
+
+/**
+ * @type {{
+ * '99': (function(Pointer): function(): null),
+ * '1': (function(Pointer): function(): Pointer),
+ * '2': (function(Pointer): function(): Pointer)}
+ * }
+ */
+const instructions = {
+  /**
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  1: (executionPointer) =>
+    () => {
+      const opcodeWithModes = executionPointer.dereference()
+      // parse opcode modes
+      const arg2Mode = opcodeWithModes % 1000 / 100
+      const arg1Mode = opcodeWithModes % 10000 / 1000
+      const resultMode = opcodeWithModes % 100000 / 10000
+
+      // load args
+      const arg0Address = executionPointer.dereference(1)
+      const arg1Address = executionPointer.dereference(2)
+      const resultAddress = executionPointer.dereference(3)
+      const arg0Value = new Pointer(executionPointer.memory, arg0Address).dereference()
+      const arg1Value = new Pointer(executionPointer.memory, arg1Address).dereference()
+      const resultPointer = new Pointer(executionPointer.memory, resultAddress)
+
+      // execute and write result
+      resultPointer.write(arg0Value + arg1Value)
+
+      // return next instruction location
+      return executionPointer.pointerWithOffset(4)
+    },
+  /**
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  2: (executionPointer) =>
+    () => {
+      const opcodeWithModes = executionPointer.dereference()
+      // parse opcode modes
+      const arg2Mode = opcodeWithModes % 1000 / 100
+      const arg1Mode = opcodeWithModes % 10000 / 1000
+      const resultMode = opcodeWithModes % 100000 / 10000
+
+      // load args
+      const arg0Address = executionPointer.dereference(1)
+      const arg1Address = executionPointer.dereference(2)
+      const resultAddress = executionPointer.dereference(3)
+      const arg0Value = new Pointer(executionPointer.memory, arg0Address).dereference()
+      const arg1Value = new Pointer(executionPointer.memory, arg1Address).dereference()
+      const resultPointer = new Pointer(executionPointer.memory, resultAddress)
+
+      // execute and write result
+      resultPointer.write(arg0Value * arg1Value)
+
+      // return next instruction location
+      return executionPointer.pointerWithOffset(4)
+    },
+  /**
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  99: (executionPointer) => () => null
+}
+
+class Program {
+  /**
+   * @param {Array<number>}programMemory
+   */
+  constructor (programMemory) {
+    this.nextInstructionPointer = new Pointer(programMemory, 0)
+  }
+
+  run () {
+    while (this.nextInstructionPointer) {
+      this.step()
+    }
+  }
+
+  // in case you want to add debugging :o)
+  step () {
+    const nextInstruction = this.loadNextInstruction(this.nextInstructionPointer)
+    this.nextInstructionPointer = nextInstruction()
+  }
+
+  /**
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  loadNextInstruction (executionPointer) {
+    const instructionCode = executionPointer.dereference()
+    const opcode = instructionCode % 100
+    const instruction = instructions[opcode]
+    if (instruction) {
+      return instruction(executionPointer)
+    }
+    throw new Error(`illegal opcode: ${opcode}`)
+  }
+}
+
+// part 1
+let programMemory = [1, 0, 0, 3, 1, 1, 2, 3, 1, 3, 4, 3, 1, 5, 0, 3, 2, 1, 13, 19, 1, 9, 19, 23, 2, 13, 23, 27, 2, 27, 13, 31, 2, 31, 10, 35, 1, 6, 35, 39, 1, 5, 39, 43, 1, 10, 43, 47, 1, 5, 47, 51, 1, 13, 51, 55, 2, 55, 9, 59, 1, 6, 59, 63, 1, 13, 63, 67, 1, 6, 67, 71, 1, 71, 10, 75, 2, 13, 75, 79, 1, 5, 79, 83, 2, 83, 6, 87, 1, 6, 87, 91, 1, 91, 13, 95, 1, 95, 13, 99, 2, 99, 13, 103, 1, 103, 5, 107, 2, 107, 10, 111, 1, 5, 111, 115, 1, 2, 115, 119, 1, 119, 6, 0, 99, 2, 0, 14, 0]
+// replace position 1 with the value 12 and replace position 2 with the value 2. What value is left at position 0 after the program halts?
+programMemory[1] = 12
+programMemory[2] = 2
+new Program(programMemory).run()
+console.log(programMemory[0])
+
+// part 2
+let noun = -1
+let verb = -1
+do {
+  noun++
+  do {
+    verb++
+
+    programMemory = [1, noun, verb, 3, 1, 1, 2, 3, 1, 3, 4, 3, 1, 5, 0, 3, 2, 1, 13, 19, 1, 9, 19, 23, 2, 13, 23, 27, 2, 27, 13, 31, 2, 31, 10, 35, 1, 6, 35, 39, 1, 5, 39, 43, 1, 10, 43, 47, 1, 5, 47, 51, 1, 13, 51, 55, 2, 55, 9, 59, 1, 6, 59, 63, 1, 13, 63, 67, 1, 6, 67, 71, 1, 71, 10, 75, 2, 13, 75, 79, 1, 5, 79, 83, 2, 83, 6, 87, 1, 6, 87, 91, 1, 91, 13, 95, 1, 95, 13, 99, 2, 99, 13, 103, 1, 103, 5, 107, 2, 107, 10, 111, 1, 5, 111, 115, 1, 2, 115, 119, 1, 119, 6, 0, 99, 2, 0, 14, 0]
+    new Program(programMemory).run()
+  } while (programMemory[0] !== 19690720 && verb < 100)
+  verb = -1
+} while (programMemory[0] !== 19690720 && noun < 100)
+console.log(100 * programMemory[1] + programMemory[2])
+```
