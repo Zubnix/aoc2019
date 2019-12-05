@@ -197,12 +197,6 @@ const instructions = {
    */
   2: (executionPointer) =>
     () => {
-      const opcodeWithModes = executionPointer.dereference()
-      // parse opcode modes
-      const arg2Mode = opcodeWithModes % 1000 / 100
-      const arg1Mode = opcodeWithModes % 10000 / 1000
-      const resultMode = opcodeWithModes % 100000 / 10000
-
       // load args
       const arg0Address = executionPointer.dereference(1)
       const arg1Address = executionPointer.dereference(2)
