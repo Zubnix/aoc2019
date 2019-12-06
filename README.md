@@ -454,3 +454,159 @@ const distance = input.trim()
 
 console.log(distance)
 ```
+
+# Day 6
+
+1
+```javascript
+//const input = require('./day6input')
+const input = `COM)B
+B)C
+C)D
+D)E
+E)F
+B)G
+G)H
+D)I
+E)J
+J)K
+K)L`
+
+/**
+ * orbit as a double linked list
+ */
+class Orbit {
+  /**
+   * @param {AllOrbits}allOrbits
+   * @param {string}orbitString
+   */
+  static create (allOrbits, orbitString) {
+    const [previousId, id] = orbitString.split(')')
+
+    const orbit = allOrbits.getOrCreateOrbit(id)
+    const previous = allOrbits.getOrCreateOrbit(previousId)
+
+    if (previous._next) {
+      // we have a branching point here, cut parent->child
+      const otherChild = previous._next
+      previous._next = null
+      // Note that we don't cut the parent<-child, so we still have our tree structure which we need to calculate our index
+      orbit._previous = previous
+
+      // add the 2 orbits as they will function as the start of a series
+      allOrbits.orbitSeries.push(otherChild)
+      allOrbits.orbitSeries.push(orbit)
+    } else {
+      orbit.previous = previous
+    }
+
+    return orbit
+  }
+
+  /**
+   * @param {string}id
+   */
+  constructor (id) {
+    this.id = id
+    /**
+     * @type {Orbit}
+     */
+    this._previous = null
+    /**
+     * @type {Orbit}
+     */
+    this._next = null
+  }
+
+  /**
+   * @param {Orbit}next
+   */
+  set next (next) {
+    next._previous = this
+    this._next = next
+  }
+
+  /**
+   * @param {Orbit}previous
+   */
+  set previous (previous) {
+    previous._next = this
+    this._previous = previous
+  }
+
+  calculateIndex () {
+    if (this._previous) {
+      return this._previous.calculateIndex() + 1
+    } else {
+      // COM
+      return 0
+    }
+  }
+}
+
+class AllOrbits {
+  /**
+   * @param orbit
+   * @return {AllOrbits}
+   */
+  static create (orbit) {
+    const allOrbits = new AllOrbits()
+    allOrbits.addOrbit(orbit)
+    allOrbits.orbitSeries.push(orbit)
+    return allOrbits
+  }
+
+  constructor () {
+    /** @type {Object.<string,Orbit>} */
+    this.all = {}
+    /**
+     * @type {Array<Orbit>}
+     */
+    this.orbitSeries = []
+  }
+
+  /**
+   * @param {Orbit}orbit
+   */
+  addOrbit (orbit) {
+    this.all[orbit.id] = orbit
+  }
+
+  /**
+   * @param {string}id
+   */
+  getOrCreateOrbit (id) {
+    let orbit = this.all[id]
+    if (orbit == undefined) {
+      orbit = new Orbit(id)
+      this.all[id] = orbit
+    }
+    return orbit
+  }
+}
+
+const totalOrbitalDistances = input.trim()
+  .split('\n')
+  .reduce(
+    (allOrbits, orbitString) => {
+      Orbit.create(allOrbits, orbitString)
+      return allOrbits
+    },
+    AllOrbits.create(new Orbit('COM', null, null))
+  ).orbitSeries
+  .map(orbitSegment => {
+    let orbit = orbitSegment
+    const firstIdx = orbit.calculateIndex()
+    let lastIdx = firstIdx
+    while (orbit._next !== null) {
+      orbit = orbit._next
+      lastIdx = orbit.calculateIndex()
+    }
+    return [firstIdx, lastIdx]
+  })
+  // Adaptation on Gauss' som formula. Gauss was a cool guy. Thanks Gauss: https://nl.wikipedia.org/wiki/Somformule_van_Gauss
+  .map(([startIdx, endIdx]) => ((startIdx + endIdx) * ((endIdx - startIdx) + 1)) / 2)
+  .reduce((previousValue, currentValue) => previousValue + currentValue)
+
+console.log(totalOrbitalDistances)
+```
