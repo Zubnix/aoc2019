@@ -869,6 +869,7 @@ console.log(totalOrbitalDistances)
 ```
 
 # Day 7
+### 1
 ```javascript
 const programMemory = require('./day7input')
 
@@ -1148,4 +1149,384 @@ const maxPhase = perm(phaseSettings).reduce((maxPhase, phaseSettings) => {
 }, 0)
 
 console.log(maxPhase)
+```
+## 2
+```javascript
+const programMemory = require('./day7input')
+const debug = false
+
+class AsyncStream {
+  constructor () {
+    /**
+     * @type {number[]}
+     */
+    this.queue = []
+    /**
+     * @type {Array<function(number):void>}
+     */
+    this.readResolves = []
+  }
+
+  /**
+   * @return {Promise<number>}
+   */
+  async read () {
+    const value = this.queue.shift()
+    if (value == null) {
+      return new Promise(resolve => { this.readResolves.push(resolve) })
+    } else {
+      return Promise.resolve(value)
+    }
+  }
+
+  /**
+   * @param {number}value
+   */
+  write (value) {
+    if (value == null) {
+      throw new Error('cant write empty value')
+    }
+
+    const resolve = this.readResolves.shift()
+    if (resolve) {
+      resolve(value)
+    } else {
+      this.queue.push(value)
+    }
+  }
+}
+
+class Pointer {
+  /**
+   * @param {Array<number>}memory
+   * @param {number}address
+   */
+  constructor (memory, address) {
+    /**
+     * @type {Array<number>}
+     */
+    this.memory = memory
+    /**
+     * @type {number}
+     */
+    this.address = address
+  }
+
+  /**
+   * @return {number}
+   */
+  dereference (offset) {
+    return this.memory[this.address + (offset || 0)]
+  }
+
+  /**
+   * @param {number}value
+   */
+  write (value) {
+    this.memory[this.address] = value
+  }
+
+  /**
+   * @param {number}offset
+   * @return {Pointer}
+   */
+  pointerWithOffset (offset) {
+    return new Pointer(this.memory, this.address + offset)
+  }
+
+  toString () {
+    return `${this.dereference()}@${this.address}`
+  }
+}
+
+const instructionMode = (instructionCode, pos) => (((instructionCode / (10 * 10 ** pos))) >> 0) % 10
+
+const parseInstructionArgs = (executionPointer) => {
+  const instructionCode = executionPointer.dereference()
+  const icFirst = instructionMode(instructionCode, 1)
+  const icSecond = instructionMode(instructionCode, 2)
+
+  const arg0 = executionPointer.dereference(1)
+  const arg1 = executionPointer.dereference(2)
+  const resultAddress = executionPointer.dereference(3)
+  const arg0Value = icFirst ? arg0 : new Pointer(executionPointer.memory, arg0).dereference()
+  const arg1Value = icSecond ? arg1 : new Pointer(executionPointer.memory, arg1).dereference()
+  const resultPointer = new Pointer(executionPointer.memory, resultAddress)
+
+  debug && console.log(`Load args: ${arg0Value}, ${arg1Value}`)
+  return { arg0Value, arg1Value, resultPointer }
+}
+
+/**
+ * @type {{
+ * '99': (function(Pointer): function(): null),
+ * '1': (function(Pointer): function(): Pointer),
+ * '2': (function(Pointer): function(): Pointer)}
+ * }
+ */
+const instructions = {
+  /**
+   * sums
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  1: (executionPointer) => {
+    // load args
+    const { arg0Value, arg1Value, resultPointer } = parseInstructionArgs(executionPointer)
+    return () => {
+      // execute and write result
+      resultPointer.write(arg0Value + arg1Value)
+      debug && console.log(`+ -> ${resultPointer.toString()}`)
+      // return next instruction location
+      return executionPointer.pointerWithOffset(4)
+    }
+  },
+  /**
+   * multiply
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  2: (executionPointer) => {
+    // load args
+    const { arg0Value, arg1Value, resultPointer } = parseInstructionArgs(executionPointer)
+    return () => {
+      // execute and write result
+      resultPointer.write(arg0Value * arg1Value)
+      debug && console.log(`* -> ${resultPointer.toString()}`)
+      // return next instruction location
+      return executionPointer.pointerWithOffset(4)
+    }
+  },
+  /**
+   * read input
+   * @param {Pointer}executionPointer
+   * @param {AsyncStream}inputStream
+   * @return {function(): Pointer}
+   */
+  3: (executionPointer, inputStream) => {
+    const arg0Address = executionPointer.dereference(1)
+    const resultPointer = new Pointer(executionPointer.memory, arg0Address)
+
+    return async () => {
+      const input = await inputStream.read()
+      if (input == null) {
+        throw new Error('Input empty')
+      }
+      resultPointer.write(input)
+      debug && console.log(`in -> ${resultPointer.toString()}`)
+      // return next instruction location
+      return executionPointer.pointerWithOffset(2)
+    }
+  },
+  /**
+   * write output
+   * @param {Pointer}executionPointer
+   * @param {AsyncStream}inputStream
+   * @param {AsyncStream}outputStream
+   * @return {function(): Pointer}
+   */
+  4: (executionPointer, inputStream, outputStream) => {
+    const arg0Address = executionPointer.dereference(1)
+    const outValue = new Pointer(executionPointer.memory, arg0Address).dereference()
+
+    return () => {
+      outputStream.write(outValue)
+      debug && console.log(`out -> ${outValue}`)
+      // return next instruction location
+      return executionPointer.pointerWithOffset(2)
+    }
+  },
+  /**
+   * jump if true
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  5: (executionPointer) => {
+    const { arg0Value, arg1Value } = parseInstructionArgs(executionPointer)
+
+    return () => {
+      if (arg0Value) {
+        debug && console.log(`jmp -> ${arg1Value}`)
+        return new Pointer(executionPointer.memory, arg1Value)
+      } else {
+        debug && console.log('jmp -> +3')
+        return executionPointer.pointerWithOffset(3)
+      }
+    }
+  },
+  /**
+   * jump if false
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  6: (executionPointer) => {
+    const { arg0Value, arg1Value } = parseInstructionArgs(executionPointer)
+
+    return () => {
+      if (arg0Value) {
+        debug && console.log('jmp -> +3')
+        return executionPointer.pointerWithOffset(3)
+      } else {
+        debug && console.log(`jmp -> ${arg1Value}`)
+        return new Pointer(executionPointer.memory, arg1Value)
+      }
+    }
+  },
+  /**
+   * less than
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  7: (executionPointer) => {
+    const { arg0Value, arg1Value, resultPointer } = parseInstructionArgs(executionPointer)
+
+    return () => {
+      arg0Value < arg1Value ? resultPointer.write(1) : resultPointer.write(0)
+      debug && console.log(`less than -> ${resultPointer.toString()}`)
+      return executionPointer.pointerWithOffset(4)
+    }
+  },
+  /**
+   * equals
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  8: (executionPointer) => {
+    const { arg0Value, arg1Value, resultPointer } = parseInstructionArgs(executionPointer)
+
+    return () => {
+      arg0Value === arg1Value ? resultPointer.write(1) : resultPointer.write(0)
+      debug && console.log(`equals -> ${resultPointer.toString()}`)
+      return executionPointer.pointerWithOffset(4)
+    }
+  },
+  /**
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  99: (executionPointer) => () => null
+}
+
+class Program {
+  /**
+   * @param {Array<number>}programMemory
+   * @param id
+   */
+  constructor (programMemory, id = '') {
+    /**
+     * @type {AsyncStream}
+     */
+    this.inputStream = new AsyncStream()
+    /**
+     * @type {AsyncStream}
+     */
+    this.outputStream = new AsyncStream()
+    /**
+     * @type {Pointer}
+     */
+    this.nextInstructionPointer = new Pointer(programMemory, 0)
+    this.id = id
+  }
+
+  async run () {
+    while (this.nextInstructionPointer) {
+      await this.step()
+    }
+  }
+
+  // in case you want to add debugging :o)
+  async step () {
+    debug && console.log(`-----${this.id}-----`)
+    const nextInstruction = this.loadNextInstruction(this.nextInstructionPointer)
+    this.nextInstructionPointer = await nextInstruction()
+  }
+
+  /**
+   * @param {Pointer}executionPointer
+   * @return {function(): Pointer}
+   */
+  loadNextInstruction (executionPointer) {
+    debug && console.log(`nip -> ${executionPointer.toString()}`)
+    const instructionCode = executionPointer.dereference()
+    const opcode = instructionCode % 100
+    const instruction = instructions[opcode]
+    if (instruction) {
+      return instruction(executionPointer, this.inputStream, this.outputStream)
+    }
+    throw new Error(`illegal opcode: ${opcode}`)
+  }
+}
+
+// stackoverflow
+function perm (xs) {
+  const ret = []
+
+  for (let i = 0; i < xs.length; i = i + 1) {
+    const rest = perm(xs.slice(0, i).concat(xs.slice(i + 1)))
+
+    if (!rest.length) {
+      ret.push([xs[i]])
+    } else {
+      for (let j = 0; j < rest.length; j = j + 1) {
+        ret.push([xs[i]].concat(rest[j]))
+      }
+    }
+  }
+  return ret
+}
+
+// part 2
+const phaseSettingsSource = perm([5, 6, 7, 8, 9])
+
+let maxPhase = 0
+
+const calculateValue = async () => {
+  for (const phaseSettings of phaseSettingsSource) {
+    const programA = new Program(programMemory.slice(), 'AMP-A')
+    const programB = new Program(programMemory.slice(), 'AMP-B')
+    const programC = new Program(programMemory.slice(), 'AMP-C')
+    const programD = new Program(programMemory.slice(), 'AMP-D')
+    const programE = new Program(programMemory.slice(), 'AMP-E')
+
+    let finished = false
+
+    programA.run().then(() => {
+      finished = true
+    })
+    programB.run().then(() => {
+      finished = true
+    })
+    programC.run().then(() => {
+      finished = true
+    })
+    programD.run().then(() => {
+      finished = true
+    })
+    programE.run().then(() => {
+      finished = true
+    })
+
+    programA.inputStream.write(phaseSettings[0])
+    programB.inputStream.write(phaseSettings[1])
+    programC.inputStream.write(phaseSettings[2])
+    programD.inputStream.write(phaseSettings[3])
+    programE.inputStream.write(phaseSettings[4])
+
+    let startInput = 0
+
+    do {
+      programA.inputStream.write(startInput)
+      programB.inputStream.write(await programA.outputStream.read())
+      programC.inputStream.write(await programB.outputStream.read())
+      programD.inputStream.write(await programC.outputStream.read())
+      programE.inputStream.write(await programD.outputStream.read())
+      startInput = await programE.outputStream.read()
+    } while (!finished)
+
+    maxPhase = startInput > maxPhase ? startInput : maxPhase
+  }
+}
+
+calculateValue().then(() => console.log(maxPhase))
+
 ```
